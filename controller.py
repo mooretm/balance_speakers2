@@ -21,6 +21,7 @@ import sounddevice as sd
 from pathlib import Path
 import time
 from threading import Thread
+import asyncio
 
 # Import misc packages
 import webbrowser
@@ -514,16 +515,10 @@ class Application(tk.Tk):
             self.sessionpars['channel_routing'].set(chan)
 
             self._on_play()
-            sd.wait(self.sessionpars['duration'].get())
-            
-            # dur_ms = math.ceil(self.sessionpars['duration'].get() * 1000)
-            # self.after(
-            #     dur_ms, 
-            #     lambda: self.main_frame._update_single_speaker_button_state(ii, 'disabled')
-            # )
-            #time.sleep(self.sessionpars['duration'].get())
+            #sd.wait(self.sessionpars['duration'].get())
+            time.sleep(self.sessionpars['duration'].get())
+        
             self.main_frame._update_single_speaker_button_state(ii, 'disabled')
-
 
         # Update mainview: END TEST
         self.main_frame.end_auto_test()
@@ -617,6 +612,11 @@ class Application(tk.Tk):
 
         # Open README in default web browser
         webbrowser.open(README.CHANGELOG_HTML)
+
+
+class ThreadedASIO:
+    def __init__(self):
+        pass
 
 
 if __name__ == "__main__":
