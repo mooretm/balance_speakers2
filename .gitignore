@@ -1,0 +1,12 @@
+__pycache__
+Data/
+*.csv
+*.wav
+*.doc
+*.docx
+
+venv/
+
+output/
+build/
+dist/
