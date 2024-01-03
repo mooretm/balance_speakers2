@@ -14,13 +14,11 @@ from tkinter import messagebox
 # Import data science packages
 import numpy as np
 import random
-import math
-import sounddevice as sd
 
 # Import system packages
 from pathlib import Path
 import time
-from threading import Thread
+import asyncio
 
 # Import misc packages
 import webbrowser
@@ -55,10 +53,10 @@ from app_assets import README
 class Application(tk.Tk):
     """ Application root window
     """
-    def __init__(self, loop, *args, **kwargs):
+    def __init__(self, async_loop, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.loop = loop
+        self.async_loop = async_loop
 
         #############
         # Constants #
@@ -231,19 +229,18 @@ class Application(tk.Tk):
 
 
     def wgn(self, dur, fs):
-        """ Function to generate white Gaussian noise.
-        """
+        """ Function to generate white Gaussian noise. """
         r = int(dur * fs)
         random.seed(4)
         wgn = [random.gauss(0.0, 1.0) for i in range(r)]
         wgn -= np.mean(wgn) # Remove DC offset
         wgn = wgn / np.max(abs(wgn)) # Normalize
+
         return wgn
 
 
     def _quit(self):
-        """ Exit the application.
-        """
+        """ Exit the application. """
         self.destroy()
 
 
@@ -251,8 +248,7 @@ class Application(tk.Tk):
     # File Menu Funcs #
     ###################
     def _show_session_dialog(self):
-        """ Show session parameter dialog
-        """
+        """ Show session parameter dialog. """
         print("\ncontroller: Calling session dialog...")
         x = sessionview.SessionDialog(self, self.sessionpars)
 
@@ -318,8 +314,8 @@ class Application(tk.Tk):
         # Check for missing offsets (i.e., speakers that weren't balanced)
         missing_offsets = self.speakers.check_for_missing_offsets()
         if missing_offsets:
-            missing = [int(val) for val in missing_offsets]
-            missing = str(missing_offsets)[1:-1]
+            missing = [int(val)+1 for val in missing_offsets]
+            missing = str(missing)[1:-1]
             resp = messagebox.askyesno(
                 title="Missing Value",
                 message="Do you want to proceed with missing offsets?",
@@ -493,10 +489,11 @@ class Application(tk.Tk):
     ########################
     def _on_test_offsets(self):
         """ Start automated offset test thread."""
-        Thread(target=self._on_test_offsets_thread).start()
+        #Thread(target=self._on_test_offsets_thread).start()
+        self.async_loop.run_until_complete(self._on_test_offsets_thread())
 
 
-    def _on_test_offsets_thread(self):
+    async def _on_test_offsets_thread(self):
         """ Automatically step through all speakers to verify
             offsets are correct.
         """
@@ -508,24 +505,23 @@ class Application(tk.Tk):
 
         # Present WGN to each speaker for the specified duration
         for ii in range(0, num_speakers):
+            # Force select a speaker radio button
             self._vars['selected_speaker'].set(ii)
+
+            # Enable the current speaker radio button
             self.main_frame._update_single_speaker_button_state(ii, 'enabled')
 
-            # Routing from the audioview is saved as a string
+            # Assign channel based on speaker
+            # Routing from the audioview is saved as a space-separated string
             chan=str(ii+1)
             self.sessionpars['channel_routing'].set(chan)
 
+            # Present audio
             self._on_play()
-            sd.wait(self.sessionpars['duration'].get())
-            
-            # dur_ms = math.ceil(self.sessionpars['duration'].get() * 1000)
-            # self.after(
-            #     dur_ms, 
-            #     lambda: self.main_frame._update_single_speaker_button_state(ii, 'disabled')
-            # )
-            #time.sleep(self.sessionpars['duration'].get())
-            self.main_frame._update_single_speaker_button_state(ii, 'disabled')
+            time.sleep(self.sessionpars['duration'].get())
 
+            # Disable speaker radio button
+            self.main_frame._update_single_speaker_button_state(ii, 'disabled')
 
         # Update mainview: END TEST
         self.main_frame.end_auto_test()
@@ -536,6 +532,7 @@ class Application(tk.Tk):
         """
         print("\ncontroller: Calling audio dialog...")
         audioview.AudioDialog(self, self.sessionpars)
+
 
     def _show_calibration_dialog(self):
         """ Display the calibration dialog window
@@ -622,5 +619,10 @@ class Application(tk.Tk):
 
 
 if __name__ == "__main__":
-    app = Application()
+    # Create an asynchronous loop
+    async_loop = asyncio.new_event_loop()
+
+    # Instantiate an instance of Application and 
+    # pass the asynchronous loop
+    app = Application(async_loop)
     app.mainloop()
