@@ -55,8 +55,10 @@ from app_assets import README
 class Application(tk.Tk):
     """ Application root window
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, loop, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        self.loop = loop
 
         #############
         # Constants #
