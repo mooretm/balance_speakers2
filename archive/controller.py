@@ -14,13 +14,13 @@ from tkinter import messagebox
 # Import data science packages
 import numpy as np
 import random
-import math
 
 # Import system packages
 from pathlib import Path
 import time
-from threading import Thread
+import threading
 import asyncio
+import sounddevice as sd
 
 # Import misc packages
 import webbrowser
@@ -55,15 +55,17 @@ from app_assets import README
 class Application(tk.Tk):
     """ Application root window
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, async_loop, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        self.async_loop = async_loop
 
         #############
         # Constants #
         #############
         self.NAME = 'Speaker Balancer'
         self.VERSION = '2.0.0'
-        self.EDITED = 'January 17, 2024'
+        self.EDITED = 'January 02, 2024'
 
         # Create menu settings dictionary
         self._app_info = {
@@ -229,19 +231,18 @@ class Application(tk.Tk):
 
 
     def wgn(self, dur, fs):
-        """ Function to generate white Gaussian noise.
-        """
+        """ Function to generate white Gaussian noise. """
         r = int(dur * fs)
         random.seed(4)
         wgn = [random.gauss(0.0, 1.0) for i in range(r)]
         wgn -= np.mean(wgn) # Remove DC offset
         wgn = wgn / np.max(abs(wgn)) # Normalize
+
         return wgn
 
 
     def _quit(self):
-        """ Exit the application.
-        """
+        """ Exit the application. """
         self.destroy()
 
 
@@ -249,8 +250,7 @@ class Application(tk.Tk):
     # File Menu Funcs #
     ###################
     def _show_session_dialog(self):
-        """ Show session parameter dialog
-        """
+        """ Show session parameter dialog. """
         print("\ncontroller: Calling session dialog...")
         x = sessionview.SessionDialog(self, self.sessionpars)
 
@@ -402,29 +402,6 @@ class Application(tk.Tk):
             raise
 
 
-    def present_audio(self, audio, pres_level, **kwargs):
-        # Load audio
-        try:
-            self._create_audio_object(audio, **kwargs)
-        except audio_exceptions.InvalidAudioType as e:
-            messagebox.showerror(
-                title="Invalid Audio Type",
-                message="The audio type is invalid!",
-                detail=f"{e} Please provide a Path or ndarray object."
-            )
-            return
-        except audio_exceptions.MissingSamplingRate as e:
-            messagebox.showerror(
-                title="Missing Sampling Rate",
-                message="No sampling rate was provided!",
-                detail=f"{e} Please provide a Path or ndarray object."
-            )
-            return
-
-        # Play audio
-        self._play(pres_level)
-
-
     def _play(self, pres_level):
         """ Format channel routing, present audio and catch 
             exceptions.
@@ -469,6 +446,29 @@ class Application(tk.Tk):
             self.a.plot_waveform("Clipped Waveform")
 
 
+    def present_audio(self, audio, pres_level, **kwargs):
+        # Load audio
+        try:
+            self._create_audio_object(audio, **kwargs)
+        except audio_exceptions.InvalidAudioType as e:
+            messagebox.showerror(
+                title="Invalid Audio Type",
+                message="The audio type is invalid!",
+                detail=f"{e} Please provide a Path or ndarray object."
+            )
+            return
+        except audio_exceptions.MissingSamplingRate as e:
+            messagebox.showerror(
+                title="Missing Sampling Rate",
+                message="No sampling rate was provided!",
+                detail=f"{e} Please provide a Path or ndarray object."
+            )
+            return
+
+        # Play audio
+        self._play(pres_level)
+
+
     def stop_audio(self):
         try:
             self.a.stop()
@@ -491,110 +491,129 @@ class Application(tk.Tk):
     ########################
     def _on_test_offsets(self):
         """ Start automated offset test thread."""
-        # Delete existig instances of thread object
-        try:
-            del self.t
-        except AttributeError:
-            print("\ncontroller: no Thread object to delete")
-            pass
+        #Thread(target=self._on_test_offsets_thread).start()
+        #self.async_loop.run_until_complete(self._on_test_offsets_thread())
 
-        # Create and call Thread instance
-        try:
-            self.t = Thread(target=self._on_test_offsets_thread)
-            self.t.start()
-        except:
-            print("\ncontroller: Failed to start audio thread.")
-            return
-
-
-    def _on_test_offsets_thread(self):
-        """ Automatically step through all speakers. """
-        import sounddevice as sd
-        fs = 48000
-        sd.default.device = self.sessionpars['audio_device'].get()
-        print(f"\ncontroller: Audio device: {sd.query_devices(sd.default.device)['name']}")
-
-        # Generate WGN
-        _wgn = self.wgn(dur=self.sessionpars['duration'].get(), fs=fs)
-        #mag = self.db2mag(self.sessionpars['level'].get())
-        #_wgn = _wgn * mag
-        #print(f"\ncontroller: Level from main view: {self.sessionpars['level'].get()}")
-        
         # Get number of speakers/channels
         num_speakers = self.sessionpars['num_speakers'].get()
 
         # Update mainview: START TEST
         self.main_frame.start_auto_test()
 
-        # Create audio object
-        #sig = audiomodel.Audio(audio=_wgn, sampling_rate=fs)
-
-
         # Present WGN to each speaker for the specified duration
         for ii in range(0, num_speakers):
-            # Select speaker number
+            self.event = threading.Event()
+            # Force select a speaker radio button
             self._vars['selected_speaker'].set(ii)
 
-            # Enable current speaker button on mainframe
+            # Enable the current speaker radio button
             self.main_frame._update_single_speaker_button_state(ii, 'enabled')
+            self.update_idletasks()
 
-
-
-
-            # # Apply offset to channel number
-            # chan = ii + 1
-
-            # # Present audio
-            # try:
-            #     print(f"controller: Iteration: {ii+1}")
-            #     sd.play(_wgn, fs, mapping=[chan])
-            #     sd.wait(self.sessionpars['duration'].get())
-            # except Exception as e:
-            #     print(e)
-            #     messagebox.showerror(
-            #         title="Audio Error",
-            #         message="Failed to play audio!",
-            #         detail=e
-            #     )
-            #     break
-
-
-
-            # Routing from the audioview is saved as a string
+            # Assign channel based on speaker
+            # Routing from the audioview is saved as a space-separated string
             chan=str(ii+1)
             self.sessionpars['channel_routing'].set(chan)
 
-            self._on_play()
-            sd.wait(self.sessionpars['duration'].get())
+            # Present audio
+            #self._on_play()
+            
+            threading.Thread(target=self._on_test_offsets_thread).start()
+            
+            if self.event.is_set():
 
-            # Disable current speaker button
-            self.main_frame._update_single_speaker_button_state(ii, 'disabled')
+                # Disable speaker radio button
+                self.main_frame._update_single_speaker_button_state(ii, 'disabled')
+                self.update_idletasks()
 
         # Update mainview: END TEST
         self.main_frame.end_auto_test()
 
 
-    # def db2mag(self, db):
-    #     """ 
-    #         Convert decibels to magnitude. Takes a single
-    #         value or a list of values.
+    #async def _on_test_offsets_thread(self):
+    def _on_test_offsets_thread(self):
+        """ Automatically step through all speakers to verify
+            offsets are correct.
+        """
+        # Generate WGN
+        FS = 48000
+        _wgn = self.wgn(dur=self.sessionpars['duration'].get(), fs=FS)
+
+        x = ThreadedASIO(self.sessionpars)
+        x.present_audio(
+            audio=_wgn, 
+            pres_level=self.sessionpars['level'].get(),
+            sampling_rate=FS
+        )
+
+        #await asyncio.sleep(self.sessionpars['duration'].get())
+        sd.wait(self.sessionpars['duration'].get())
+        #time.sleep(self.sessionpars['duration'].get())
+
+        self.event.set()
+
+        self.update_idletasks()
+
+
+
+
+
+
+
+    # def _on_test_offsets(self):
+    #     """ Start automated offset test thread."""
+    #     #Thread(target=self._on_test_offsets_thread).start()
+    #     self.async_loop.run_until_complete(self._on_test_offsets_thread())
+
+
+    # async def _on_test_offsets_thread(self):
+    #     """ Automatically step through all speakers to verify
+    #         offsets are correct.
     #     """
-    #     # Must use this form to handle negative db values!
-    #     try:
-    #         mag = [10**(x/20) for x in db]
-    #         return mag
-    #     except:
-    #         mag = 10**(db/20)
-    #         return mag
+    #     # Get number of speakers/channels
+    #     num_speakers = self.sessionpars['num_speakers'].get()
+
+    #     # Update mainview: START TEST
+    #     self.main_frame.start_auto_test()
+
+    #     # Present WGN to each speaker for the specified duration
+    #     for ii in range(0, num_speakers):
+    #         # Force select a speaker radio button
+    #         self._vars['selected_speaker'].set(ii)
+
+    #         # Enable the current speaker radio button
+    #         self.main_frame._update_single_speaker_button_state(ii, 'enabled')
+    #         self.update_idletasks()
+
+    #         # Assign channel based on speaker
+    #         # Routing from the audioview is saved as a space-separated string
+    #         chan=str(ii+1)
+    #         self.sessionpars['channel_routing'].set(chan)
+
+    #         # Present audio
+    #         self._on_play()
+    #         #await asyncio.sleep(self.sessionpars['duration'].get())
+    #         #sd.wait(self.sessionpars['duration'].get())
+    #         #time.sleep(self.sessionpars['duration'].get())
+
+    #         # Disable speaker radio button
+    #         self.main_frame._update_single_speaker_button_state(ii, 'disabled')
+    #         self.update_idletasks()
+
+    #     # Update mainview: END TEST
+    #     self.main_frame.end_auto_test()
 
 
     def _show_audio_dialog(self):
-        """ Show audio settings dialog. """
+        """ Show audio settings dialog
+        """
         print("\ncontroller: Calling audio dialog...")
         audioview.AudioDialog(self, self.sessionpars)
 
+
     def _show_calibration_dialog(self):
-        """ Display the calibration dialog window. """
+        """ Display the calibration dialog window
+        """
         print("\ncontroller: Calling calibration dialog...")
         calibrationview.CalibrationDialog(self, self.sessionpars)
 
@@ -676,6 +695,126 @@ class Application(tk.Tk):
         webbrowser.open(README.CHANGELOG_HTML)
 
 
+class ThreadedASIO(threading.Thread):
+    # def __init__(self, audio, pres_level, **kwargs):
+    #     self.present_audio(audio, pres_level, **kwargs)
+
+    def __init__(self, sessionpars):
+        import sounddevice as sd
+        self.sessionpars = sessionpars
+        threading.Thread.__init__(self)
+
+    def _create_audio_object(self, audio, **kwargs):
+        # Create audio object
+        try:
+            self.a = audiomodel.Audio(
+                audio=audio,
+                **kwargs
+            )
+        except FileNotFoundError:
+            messagebox.showerror(
+                title="File Not Found",
+                message="Cannot find the audio file!",
+                detail="Go to File>Session to specify a valid audio path."
+            )
+            #self._show_session_dialog()
+            return
+        except audio_exceptions.InvalidAudioType:
+            raise
+        except audio_exceptions.MissingSamplingRate:
+            raise
+
+
+    def present_audio(self, audio, pres_level, **kwargs):
+        # Load audio
+        try:
+            self._create_audio_object(audio, **kwargs)
+        except audio_exceptions.InvalidAudioType as e:
+            messagebox.showerror(
+                title="Invalid Audio Type",
+                message="The audio type is invalid!",
+                detail=f"{e} Please provide a Path or ndarray object."
+            )
+            return
+        except audio_exceptions.MissingSamplingRate as e:
+            messagebox.showerror(
+                title="Missing Sampling Rate",
+                message="No sampling rate was provided!",
+                detail=f"{e} Please provide a Path or ndarray object."
+            )
+            return
+
+        # Play audio
+        self._play(pres_level)
+
+
+    def _play(self, pres_level):
+        """ Format channel routing, present audio and catch 
+            exceptions.
+        """
+        # Attempt to present audio
+        try:
+            self.a.play(
+                level=pres_level,
+                device_id=self.sessionpars['audio_device'].get(),
+                routing=self._format_routing(
+                    self.sessionpars['channel_routing'].get())
+            )
+            sd.wait(self.sessionpars['duration'].get())
+        except audio_exceptions.InvalidAudioDevice as e:
+            print(e)
+            messagebox.showerror(
+                title="Invalid Device",
+                message="Invalid audio device! Go to Tools>Audio Settings " +
+                    "to select a valid audio device.",
+                detail = e
+            )
+            # Open Audio Settings window
+            #self._show_audio_dialog()
+        except audio_exceptions.InvalidRouting as e:
+            print(e)
+            messagebox.showerror(
+                title="Invalid Routing",
+                message="Speaker routing must correspond with the " +
+                    "number of channels in the audio file! Go to " +
+                    "Tools>Audio Settings to update the routing.",
+                detail=e
+            )
+            # Open Audio Settings window
+            #self._show_audio_dialog()
+        except audio_exceptions.Clipping:
+            print("controller: Clipping has occurred! Aborting!")
+            messagebox.showerror(
+                title="Clipping",
+                message="The level is too high and caused clipping.",
+                detail="The waveform will be plotted when this message is " +
+                    "closed for visual inspection."
+            )
+            self.a.plot_waveform("Clipped Waveform")
+
+
+    def stop_audio(self):
+        try:
+            self.a.stop()
+        except AttributeError:
+            print("\ncontroller: Stop called, but there is no audio object!")
+
+
+    def _format_routing(self, routing):
+        """ Convert space-separated string to list of ints
+            for speaker routing.
+        """
+        routing = routing.split()
+        routing = [int(x) for x in routing]
+
+        return routing
+
+
 if __name__ == "__main__":
-    app = Application()
+    # Create an asynchronous loop
+    async_loop = asyncio.get_event_loop()
+
+    # Instantiate an instance of Application and 
+    # pass the asynchronous loop
+    app = Application(async_loop)
     app.mainloop()

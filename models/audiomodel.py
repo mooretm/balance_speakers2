@@ -35,6 +35,8 @@ class Audio:
             audio: a Path object from pathlib, or a numpy array
             kwargs: must provide a sampling rate when passing an array
         """
+        import sounddevice as sd
+        
         # Assign public attributes
         self.audio = audio
 
