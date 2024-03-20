@@ -1,5 +1,4 @@
-""" Main menu class
-"""
+""" Main menu class. """
 
 ###########
 # Imports #
@@ -9,7 +8,7 @@ import tkinter as tk
 from tkinter import messagebox
 
 # Import custom modules
-from app_assets import images
+from tmgui.shared_assets import images
 
 
 #########
@@ -28,10 +27,7 @@ class MainMenu(tk.Menu):
 
 
     def _bind_accelerators(self):
-        """ Bind shortcut keys to event triggers.
-        """
-        #self.bind_all('<space>', self._event('<<PlaybackStart>>'))
-        #self.bind_all('<Control-c>', self._event('<<PlaybackStop>>'))
+        """ Bind shortcut keys to event triggers. """
         self.bind_all('<Control-q>', self._event('<<FileQuit>>'))
 
 
@@ -75,13 +71,6 @@ class MainMenu(tk.Menu):
             image=self.icons['file_settings'],
             compound=tk.LEFT
         )
-        # self.file_menu.add_separator()
-        # self.file_menu.add_command(
-        #     label="Test Offsets",
-        #     command=self._event('<<FileTestOffsets>>'),
-        #     image=self.icons['file_start'],
-        #     compound=tk.LEFT
-        # )
         self.file_menu.add_separator()
         self.file_menu.add_command(
             label="Quit",
@@ -117,24 +106,6 @@ class MainMenu(tk.Menu):
         )
         # Add Tools menu to the menubar
         self.add_cascade(label="Tools", menu=tools_menu)
-
-
-        #################
-        # Playback Menu #
-        #################
-        # playback_menu = tk.Menu(self, tearoff=False)
-        # playback_menu.add_command(
-        #     label="Start Audio",
-        #     command=self._event('<<PlaybackStart>>'),
-        #     accelerator='Spacebar'
-        # )
-        # playback_menu.add_separator()
-        # playback_menu.add_command(
-        #     label="Stop Audio",
-        #     command=self._event('<<PlaybackStop>>'),
-        #     accelerator='Ctrl+C'
-        # )
-        # self.add_cascade(label='Playback', menu=playback_menu)
 
 
         #############

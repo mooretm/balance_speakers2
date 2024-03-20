@@ -1,4 +1,4 @@
-""" Session parameters dialog """
+""" Settings dialog. """
 
 ###########
 # Imports #
@@ -6,7 +6,6 @@
 # Import GUI packages
 import tkinter as tk
 from tkinter import ttk
-from tkinter import messagebox
 
 
 #########

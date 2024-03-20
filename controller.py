@@ -7,46 +7,45 @@
 ###########
 # Imports #
 ###########
-# Import GUI packages
+# GUI
 import tkinter as tk
 from tkinter import messagebox
 
-# Import data science packages
+# Data Science
 import numpy as np
 import random
-import math
 
-# Import system packages
+# System
 from pathlib import Path
-import time
 from threading import Thread
-import asyncio
+import os, sys, time, datetime
 
-# Import misc packages
-import webbrowser
-import markdown
+# Web
+import webbrowser, markdown
 
-# Import custom modules
-# Menu imports
+# Custom Modules
+sys.path.append(os.environ['TMPY'])
+# Menus
 from menus import mainmenu
 # Exception imports
-from exceptions import audio_exceptions
-# Model imports
+from tmgui.shared_exceptions import audio_exceptions
+# Models
+from tmgui.shared_models import versionmodel
+from tmgui.shared_models import audiomodel
+from tmgui.shared_models import filehandler as fh
+from tmgui.shared_models import calmodel
 from models import sessionmodel
-from models import versionmodel
-from models import audiomodel
-from models import calmodel
-from models import csvmodel
 from models import speakermodel
-# View imports
+# Views
 from views import mainview
 from views import sessionview
-from views import audioview
-from views import calibrationview
-# Image imports
-from app_assets import images
-# Help imports
+from tmgui.shared_views import audioview
+from tmgui.shared_views import calibrationview
+# Images
+from tmgui.shared_assets import images
+# Help
 from app_assets import README
+from app_assets import CHANGELOG
 
 
 #########
@@ -62,8 +61,8 @@ class Application(tk.Tk):
         # Constants #
         #############
         self.NAME = 'Speaker Balancer'
-        self.VERSION = '2.0.0'
-        self.EDITED = 'January 17, 2024'
+        self.VERSION = '3.0.0'
+        self.EDITED = 'March 20, 2024'
 
         # Create menu settings dictionary
         self._app_info = {
@@ -105,9 +104,6 @@ class Application(tk.Tk):
         # Create SpeakerWrangler object
         self.speakers = self._create_speakerwrangler()
 
-        # Load CSV writer model
-        self.csvmodel = csvmodel.CSVModel(self.sessionpars)
-
         # Load calibration model
         self.calmodel = calmodel.CalModel(self.sessionpars)
 
@@ -123,7 +119,6 @@ class Application(tk.Tk):
         event_callbacks = {
             # File menu
             '<<FileSession>>': lambda _: self._show_session_dialog(),
-            #'<<FileTestOffsets>>': lambda _: self._on_test_offsets(),
             '<<FileQuit>>': lambda _: self._quit(),
 
             # Tools menu
@@ -201,8 +196,7 @@ class Application(tk.Tk):
     # General Functions #
     #####################
     def center_window(self):
-        """ Center the root window 
-        """
+        """ Center the root window. """
         self.update_idletasks()
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
@@ -211,6 +205,12 @@ class Application(tk.Tk):
         y = screen_height/2 - size[1]/2
         self.geometry("+%d+%d" % (x, y))
         self.deiconify()
+
+
+    def _create_filename(self):
+        """ Create file name and path. """
+        datestamp = datetime.datetime.now().strftime("%Y_%b_%d_%H%M")
+        self.filename = "speaker_offsets_" + datestamp + ".csv"
 
 
     def _create_speakerwrangler(self):
@@ -229,8 +229,7 @@ class Application(tk.Tk):
 
 
     def wgn(self, dur, fs):
-        """ Function to generate white Gaussian noise.
-        """
+        """ Function to generate white Gaussian noise. """
         r = int(dur * fs)
         random.seed(4)
         wgn = [random.gauss(0.0, 1.0) for i in range(r)]
@@ -240,8 +239,7 @@ class Application(tk.Tk):
 
 
     def _quit(self):
-        """ Exit the application.
-        """
+        """ Exit the application. """
         self.destroy()
 
 
@@ -249,10 +247,9 @@ class Application(tk.Tk):
     # File Menu Funcs #
     ###################
     def _show_session_dialog(self):
-        """ Show session parameter dialog
-        """
+        """ Show session parameter dialog. """
         print("\ncontroller: Calling session dialog...")
-        x = sessionview.SessionDialog(self, self.sessionpars)
+        sessionview.SessionDialog(self, self.sessionpars)
 
 
     ########################
@@ -293,7 +290,7 @@ class Application(tk.Tk):
                 offset=self.speakers.speaker_list[current_speaker].offset
             )
         except TypeError as e:
-            msg = "You must start with channel 1 to create a reference level!"
+            msg = "Please start with channel 1 to create a reference level!"
             print("\ncontroller: " + msg)
             messagebox.showwarning(
                 title="Invalid Reference Level",
@@ -308,11 +305,8 @@ class Application(tk.Tk):
 
     def _on_save(self):
         """ Create dictionary with channels and offsets.
-            Send dictionary to csvmodel. 
+            Save dictionary to CSV. 
         """
-        # Create offsets dictionary
-        offset_dict = self.speakers.get_data()
-
         # Check for missing offsets (i.e., speakers that weren't balanced)
         missing_offsets = self.speakers.check_for_missing_offsets()
         if missing_offsets:
@@ -326,9 +320,21 @@ class Application(tk.Tk):
             if not resp:
                 return
   
-        # Call csvmodel save function
+        # Create offsets dictionary
+        offset_dict = self.speakers.get_data()
+        print(offset_dict)
+
+        # Create file name
+        self._create_filename()
+
+        # Call filehandler save function
         try:
-            self.csvmodel.save_record(offset_dict)
+            #_filepath = os.path.join("Data", self.filename)
+            self.mycsv = fh.CSVFile(
+                filepath=self.filename, 
+                data=offset_dict, 
+                file_browser=True
+            )
         except PermissionError as e:
             print(e)
             messagebox.showerror(
@@ -376,6 +382,146 @@ class Application(tk.Tk):
         for key, variable in self.sessionpars.items():
             self.sessionpars_model.set(key, variable.get())
             self.sessionpars_model.save()
+
+
+    ########################
+    # Tools Menu Functions #
+    ########################
+    def _on_test_offsets(self):
+        """ Start automated offset test thread."""
+        # Delete existig instances of thread object
+        try:
+            del self.t
+        except AttributeError:
+            pass
+
+        # Create and call Thread instance
+        try:
+            self.t = Thread(target=self._on_test_offsets_thread)
+            self.t.start()
+        except:
+            print("\ncontroller: Failed to start audio thread.")
+            return
+
+
+    def _on_test_offsets_thread(self):
+        """ Automatically step through all speakers. """
+        # Get number of speakers/channels
+        num_speakers = self.sessionpars['num_speakers'].get()
+
+        # Update mainview: START TEST
+        self.main_frame.start_auto_test()
+
+        # Present WGN to each speaker for the specified duration
+        for ii in range(0, num_speakers):
+            # Select speaker number
+            self._vars['selected_speaker'].set(ii)
+
+            # Enable current speaker button on mainframe
+            self.main_frame._update_single_speaker_button_state(ii, 'enabled')
+
+            # Routing from the audioview is saved as a string
+            chan=str(ii+1)
+            self.sessionpars['channel_routing'].set(chan)
+
+            self._on_play()
+            #sd.wait(self.sessionpars['duration'].get())
+            time.sleep(self.sessionpars['duration'].get())
+
+            # Disable current speaker button
+            self.main_frame._update_single_speaker_button_state(ii, 'disabled')
+
+        # Update mainview: END TEST
+        self.main_frame.end_auto_test()
+
+
+    def _show_audio_dialog(self):
+        """ Show audio settings dialog. """
+        print("\ncontroller: Calling audio dialog...")
+        audioview.AudioDialog(self, self.sessionpars)
+
+
+    def _show_calibration_dialog(self):
+        """ Display the calibration dialog window. """
+        print("\ncontroller: Calling calibration dialog...")
+        calibrationview.CalibrationDialog(self, self.sessionpars)
+
+
+    ################################
+    # Calibration Dialog Functions #
+    ################################
+    def play_calibration_file(self):
+        """ Load calibration file and present
+        """
+        # Get calibration file
+        try:
+            self.calmodel.get_cal_file()
+        except AttributeError:
+            messagebox.showerror(
+                title="File Not Found",
+                message="Cannot find internal calibration file!",
+                detail="Please use a custom calibration file."
+            )
+        # Present calibration signal
+        self.present_audio(
+            audio=Path(self.calmodel.cal_file), 
+            pres_level=self.sessionpars['cal_level_dB'].get()
+        )
+
+
+    def _calc_offset(self):
+        """ Calculate offset based on SLM reading.
+        """
+        # Calculate new presentation level
+        self.calmodel.calc_offset()
+        # Save level - this must be called here!
+        self._save_sessionpars()
+
+
+    def _calc_level(self, desired_spl):
+        """ Calculate new dB FS level using slm_offset.
+        """
+        # Calculate new presentation level
+        self.calmodel.calc_level(desired_spl)
+        # Save level - this must be called here!
+        self._save_sessionpars()
+
+
+    #######################
+    # Help Menu Functions #
+    #######################
+    def _show_help(self):
+        """ Create html help file and display in default browser
+        """
+        print(f"\ncontroller: Calling README file (will open in browser)")
+        # Read markdown file and convert to html
+        with open(README.README_MD, 'r') as f:
+            text = f.read()
+            html = markdown.markdown(text)
+
+        # Create html file for display
+        with open(README.README_HTML, 'w') as f:
+            f.write(html)
+
+        # Open README in default web browser
+        webbrowser.open(README.README_HTML)
+
+
+    def _show_changelog(self):
+        """ Create html CHANGELOG file and display in default browser
+        """
+        print(f"\ncontroller: Calling CHANGELOG file (will open in browser)")
+        # Read markdown file and convert to html
+        with open(CHANGELOG.CHANGELOG_MD, 'r') as f:
+            text = f.read()
+            html = markdown.markdown(text)
+
+        # Create html file for display
+        with open(CHANGELOG.CHANGELOG_HTML, 'w') as f:
+            f.write(html)
+
+        # Open CHANGELOG in default web browser
+        webbrowser.open(CHANGELOG.CHANGELOG_HTML)
 
 
     ###################
@@ -484,196 +630,6 @@ class Application(tk.Tk):
         routing = [int(x) for x in routing]
 
         return routing
-
-
-    ########################
-    # Tools Menu Functions #
-    ########################
-    def _on_test_offsets(self):
-        """ Start automated offset test thread."""
-        # Delete existig instances of thread object
-        try:
-            del self.t
-        except AttributeError:
-            print("\ncontroller: no Thread object to delete")
-            pass
-
-        # Create and call Thread instance
-        try:
-            self.t = Thread(target=self._on_test_offsets_thread)
-            self.t.start()
-        except:
-            print("\ncontroller: Failed to start audio thread.")
-            return
-
-
-    def _on_test_offsets_thread(self):
-        """ Automatically step through all speakers. """
-        import sounddevice as sd
-        fs = 48000
-        sd.default.device = self.sessionpars['audio_device'].get()
-        print(f"\ncontroller: Audio device: {sd.query_devices(sd.default.device)['name']}")
-
-        # Generate WGN
-        _wgn = self.wgn(dur=self.sessionpars['duration'].get(), fs=fs)
-        #mag = self.db2mag(self.sessionpars['level'].get())
-        #_wgn = _wgn * mag
-        #print(f"\ncontroller: Level from main view: {self.sessionpars['level'].get()}")
-        
-        # Get number of speakers/channels
-        num_speakers = self.sessionpars['num_speakers'].get()
-
-        # Update mainview: START TEST
-        self.main_frame.start_auto_test()
-
-        # Create audio object
-        #sig = audiomodel.Audio(audio=_wgn, sampling_rate=fs)
-
-
-        # Present WGN to each speaker for the specified duration
-        for ii in range(0, num_speakers):
-            # Select speaker number
-            self._vars['selected_speaker'].set(ii)
-
-            # Enable current speaker button on mainframe
-            self.main_frame._update_single_speaker_button_state(ii, 'enabled')
-
-
-
-
-            # # Apply offset to channel number
-            # chan = ii + 1
-
-            # # Present audio
-            # try:
-            #     print(f"controller: Iteration: {ii+1}")
-            #     sd.play(_wgn, fs, mapping=[chan])
-            #     sd.wait(self.sessionpars['duration'].get())
-            # except Exception as e:
-            #     print(e)
-            #     messagebox.showerror(
-            #         title="Audio Error",
-            #         message="Failed to play audio!",
-            #         detail=e
-            #     )
-            #     break
-
-
-
-            # Routing from the audioview is saved as a string
-            chan=str(ii+1)
-            self.sessionpars['channel_routing'].set(chan)
-
-            self._on_play()
-            sd.wait(self.sessionpars['duration'].get())
-
-            # Disable current speaker button
-            self.main_frame._update_single_speaker_button_state(ii, 'disabled')
-
-        # Update mainview: END TEST
-        self.main_frame.end_auto_test()
-
-
-    # def db2mag(self, db):
-    #     """ 
-    #         Convert decibels to magnitude. Takes a single
-    #         value or a list of values.
-    #     """
-    #     # Must use this form to handle negative db values!
-    #     try:
-    #         mag = [10**(x/20) for x in db]
-    #         return mag
-    #     except:
-    #         mag = 10**(db/20)
-    #         return mag
-
-
-    def _show_audio_dialog(self):
-        """ Show audio settings dialog. """
-        print("\ncontroller: Calling audio dialog...")
-        audioview.AudioDialog(self, self.sessionpars)
-
-    def _show_calibration_dialog(self):
-        """ Display the calibration dialog window. """
-        print("\ncontroller: Calling calibration dialog...")
-        calibrationview.CalibrationDialog(self, self.sessionpars)
-
-
-    ################################
-    # Calibration Dialog Functions #
-    ################################
-    def play_calibration_file(self):
-        """ Load calibration file and present
-        """
-        # Get calibration file
-        try:
-            self.calmodel.get_cal_file()
-        except AttributeError:
-            messagebox.showerror(
-                title="File Not Found",
-                message="Cannot find internal calibration file!",
-                detail="Please use a custom calibration file."
-            )
-        # Present calibration signal
-        self.present_audio(
-            audio=Path(self.calmodel.cal_file), 
-            pres_level=self.sessionpars['cal_level_dB'].get()
-        )
-
-
-    def _calc_offset(self):
-        """ Calculate offset based on SLM reading.
-        """
-        # Calculate new presentation level
-        self.calmodel.calc_offset()
-        # Save level - this must be called here!
-        self._save_sessionpars()
-
-
-    def _calc_level(self, desired_spl):
-        """ Calculate new dB FS level using slm_offset.
-        """
-        # Calculate new presentation level
-        self.calmodel.calc_level(desired_spl)
-        # Save level - this must be called here!
-        self._save_sessionpars()
-
-
-    #######################
-    # Help Menu Functions #
-    #######################
-    def _show_help(self):
-        """ Create html help file and display in default browser
-        """
-        print(f"\ncontroller: Calling README file (will open in browser)")
-        # Read markdown file and convert to html
-        with open(README.README_MD, 'r') as f:
-            text = f.read()
-            html = markdown.markdown(text)
-
-        # Create html file for display
-        with open(README.README_HTML, 'w') as f:
-            f.write(html)
-
-        # Open README in default web browser
-        webbrowser.open(README.README_HTML)
-
-
-    def _show_changelog(self):
-        """ Create html help file and display in default browser
-        """
-        print(f"\ncontroller: Calling CHANGELOG file (will open in browser)")
-        # Read markdown file and convert to html
-        with open(README.CHANGELOG_MD, 'r') as f:
-            text = f.read()
-            html = markdown.markdown(text)
-
-        # Create html file for display
-        with open(README.CHANGELOG_HTML, 'w') as f:
-            f.write(html)
-
-        # Open README in default web browser
-        webbrowser.open(README.CHANGELOG_HTML)
 
 
 if __name__ == "__main__":
