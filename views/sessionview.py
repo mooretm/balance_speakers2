@@ -14,10 +14,10 @@ from tkinter import ttk
 class SessionDialog(tk.Toplevel):
     """ Dialog for setting session parameters
     """
-    def __init__(self, parent, sessionpars, *args, **kwargs):
+    def __init__(self, parent, settings, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.parent = parent
-        self.sessionpars = sessionpars
+        self.settings = settings
 
         self.withdraw()
         self.resizable(False, False)
@@ -58,7 +58,7 @@ class SessionDialog(tk.Toplevel):
         ttk.Label(frm_session, text="Number of Speakers:",
             ).grid(row=5, column=5, sticky='e', **widget_options)
         ttk.Entry(frm_session, width=6, 
-            textvariable=self.sessionpars['num_speakers']
+            textvariable=self.settings['num_speakers']
             ).grid(row=5, column=10, sticky='w')
         ttk.Label(frm_session, text="(Requires restart)"
             ).grid(row=5, column=15, sticky='w', padx=5)
@@ -73,7 +73,7 @@ class SessionDialog(tk.Toplevel):
 
         # # Retrieve and truncate previous audio directory
         # short_audio_path = general.truncate_path(
-        #     self.sessionpars['audio_files_dir'].get()
+        #     self.settings['audio_files_dir'].get()
         # )
 
         # # Create textvariable

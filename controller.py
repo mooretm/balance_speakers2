@@ -1,4 +1,6 @@
-""" Speaker Balancer. App to balance lab speakers.
+""" Speaker Balancer. 
+
+    App to balance lab speakers using a sound level meter.
 
     Written by: Travis M. Moore
     Created: June 09, 2022
@@ -34,7 +36,7 @@ from tmgui.shared_models import versionmodel
 from tmgui.shared_models import audiomodel
 from tmgui.shared_models import filehandler as fh
 from tmgui.shared_models import calmodel
-from models import sessionmodel
+from models import settingsmodel
 from models import speakermodel
 # Views
 from views import mainview
@@ -98,17 +100,17 @@ class Application(tk.Tk):
         # Load current session parameters from file
         # or load defaults if file does not exist yet
         # Check for version updates and destroy if mandatory
-        self.sessionpars_model = sessionmodel.SessionParsModel(self._app_info)
+        self.settings_model = settingsmodel.SettingsModel(self._app_info)
         self._load_sessionpars()
 
         # Create SpeakerWrangler object
         self.speakers = self._create_speakerwrangler()
 
         # Load calibration model
-        self.calmodel = calmodel.CalModel(self.sessionpars)
+        self.calmodel = calmodel.CalModel(self.settings)
 
         # Load main view
-        self.main_frame = mainview.MainFrame(self, self.sessionpars, self._vars)
+        self.main_frame = mainview.MainFrame(self, self.settings, self._vars)
         self.main_frame.grid(row=5, column=5)
 
         # Load menus
@@ -156,9 +158,9 @@ class Application(tk.Tk):
         self.center_window()
 
         # Check for updates
-        if (self.sessionpars['check_for_updates'].get() == 'yes') and\
-        (self.sessionpars['config_file_status'].get() == 1):
-            _filepath = self.sessionpars['version_lib_path'].get()
+        if (self.settings['check_for_updates'].get() == 'yes') and\
+        (self.settings['config_file_status'].get() == 1):
+            _filepath = self.settings['version_lib_path'].get()
             u = versionmodel.VersionChecker(_filepath, self.NAME, self.VERSION)
             if u.status == 'mandatory':
                 messagebox.showerror(
@@ -218,7 +220,7 @@ class Application(tk.Tk):
             the specified number of speakers.
         """
         # Get specified number of speakers
-        num_speakers = self.sessionpars['num_speakers'].get()
+        num_speakers = self.settings['num_speakers'].get()
 
         # Instantiate and populate SpeakerWrangler
         sw = speakermodel.SpeakerWrangler()
@@ -249,7 +251,7 @@ class Application(tk.Tk):
     def _show_session_dialog(self):
         """ Show session parameter dialog. """
         print("\ncontroller: Calling session dialog...")
-        sessionview.SessionDialog(self, self.sessionpars)
+        sessionview.SessionDialog(self, self.settings)
 
 
     ########################
@@ -262,18 +264,18 @@ class Application(tk.Tk):
 
         # Generate WGN
         FS = 48000
-        _wgn = self.wgn(dur=self.sessionpars['duration'].get(), fs=FS)
+        _wgn = self.wgn(dur=self.settings['duration'].get(), fs=FS)
 
         # Present WGN
         self.present_audio(
             audio=_wgn, 
-            pres_level=self.sessionpars['level'].get(),
+            pres_level=self.settings['level'].get(),
             sampling_rate=FS
         )
 
 
     def _on_submit(self):
-        """ Save SLM Reading value and update Speaker object."""
+        """ Save SLM Reading value and update Speaker object. """
         # Get current values
         current_speaker = self._vars['selected_speaker'].get()
         slm_level = self._vars['slm_reading'].get()
@@ -284,7 +286,6 @@ class Application(tk.Tk):
                 channel=current_speaker, 
                 slm_level=slm_level
             )
-
             self.main_frame.update_offset_labels(
                 channel=current_speaker,
                 offset=self.speakers.speaker_list[current_speaker].offset
@@ -357,7 +358,7 @@ class Application(tk.Tk):
     # Session Dialog Functions #
     ############################
     def _load_sessionpars(self):
-        """ Load parameters into self.sessionpars dict 
+        """ Load parameters into self.settings dict 
         """
         vartypes = {
         'bool': tk.BooleanVar,
@@ -367,10 +368,10 @@ class Application(tk.Tk):
         }
 
         # Create runtime dict from session model fields
-        self.sessionpars = dict()
-        for key, data in self.sessionpars_model.fields.items():
+        self.settings = dict()
+        for key, data in self.settings_model.fields.items():
             vartype = vartypes.get(data['type'], tk.StringVar)
-            self.sessionpars[key] = vartype(value=data['value'])
+            self.settings[key] = vartype(value=data['value'])
         print("\ncontroller: Loaded sessionpars model fields into " +
             "running sessionpars dict")
 
@@ -379,9 +380,9 @@ class Application(tk.Tk):
         """ Save current runtime parameters to file 
         """
         print("\ncontroller: Calling sessionpars model set and save funcs")
-        for key, variable in self.sessionpars.items():
-            self.sessionpars_model.set(key, variable.get())
-            self.sessionpars_model.save()
+        for key, variable in self.settings.items():
+            self.settings_model.set(key, variable.get())
+            self.settings_model.save()
 
 
     ########################
@@ -407,7 +408,7 @@ class Application(tk.Tk):
     def _on_test_offsets_thread(self):
         """ Automatically step through all speakers. """
         # Get number of speakers/channels
-        num_speakers = self.sessionpars['num_speakers'].get()
+        num_speakers = self.settings['num_speakers'].get()
 
         # Update mainview: START TEST
         self.main_frame.start_auto_test()
@@ -422,11 +423,11 @@ class Application(tk.Tk):
 
             # Routing from the audioview is saved as a string
             chan=str(ii+1)
-            self.sessionpars['channel_routing'].set(chan)
+            self.settings['channel_routing'].set(chan)
 
             self._on_play()
-            #sd.wait(self.sessionpars['duration'].get())
-            time.sleep(self.sessionpars['duration'].get())
+            #sd.wait(self.settings['duration'].get())
+            time.sleep(self.settings['duration'].get())
 
             # Disable current speaker button
             self.main_frame._update_single_speaker_button_state(ii, 'disabled')
@@ -438,13 +439,13 @@ class Application(tk.Tk):
     def _show_audio_dialog(self):
         """ Show audio settings dialog. """
         print("\ncontroller: Calling audio dialog...")
-        audioview.AudioDialog(self, self.sessionpars)
+        audioview.AudioDialog(self, self.settings)
 
 
     def _show_calibration_dialog(self):
         """ Display the calibration dialog window. """
         print("\ncontroller: Calling calibration dialog...")
-        calibrationview.CalibrationDialog(self, self.sessionpars)
+        calibrationview.CalibrationDialog(self, self.settings)
 
 
     ################################
@@ -465,7 +466,7 @@ class Application(tk.Tk):
         # Present calibration signal
         self.present_audio(
             audio=Path(self.calmodel.cal_file), 
-            pres_level=self.sessionpars['cal_level_dB'].get()
+            pres_level=self.settings['cal_level_dB'].get()
         )
 
 
@@ -579,9 +580,9 @@ class Application(tk.Tk):
         try:
             self.a.play(
                 level=pres_level,
-                device_id=self.sessionpars['audio_device'].get(),
+                device_id=self.settings['audio_device'].get(),
                 routing=self._format_routing(
-                    self.sessionpars['channel_routing'].get())
+                    self.settings['channel_routing'].get())
             )
         except audio_exceptions.InvalidAudioDevice as e:
             print(e)

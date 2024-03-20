@@ -1,5 +1,4 @@
-""" Model for storing session parameters 
-"""
+""" Model for storing application settings. """
 
 ############
 # IMPORTS  #
@@ -15,7 +14,7 @@ import json
 #########
 # BEGIN #
 #########
-class SessionParsModel:
+class SettingsModel:
     # Define dictionary items
     fields = {
         # Session variables

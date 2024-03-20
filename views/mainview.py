@@ -12,22 +12,21 @@ from tkinter import ttk
 # BEGIN #
 #########
 class MainFrame(ttk.Frame):
-    def __init__(self, parent, sessionpars, _vars, *args, **kwargs):
+    def __init__(self, parent, settings, _vars, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
 
         # Assign variables
         self.parent = parent
-        self.sessionpars = sessionpars
+        self.settings = settings
         self._vars = _vars
-        self._num_speakers = sessionpars['num_speakers'].get()
+        self._num_speakers = settings['num_speakers'].get()
 
         # Populate frame with widgets
         self.draw_widgets()
 
 
     def draw_widgets(self):
-        """ Populate the main view with all widgets
-        """
+        """ Populate the main view with all widgets. """
         ##########
         # Styles #
         ##########
@@ -41,13 +40,6 @@ class MainFrame(ttk.Frame):
 
         # Colors
         custom_color = 'DeepSkyBlue' # 'SystemWindow' 'DeepSkyBlue'
-        # self.style.configure('TLabelframe', background=custom_color)
-        # self.style.configure('TLabelframe.Label', background=custom_color)
-        # self.style.configure('TFrame', background=custom_color)
-        # self.style.configure('TLabel', background=custom_color)
-        # self.style.configure('TRadiobutton', background=custom_color)
-        # self.style.configure('TButton', background=custom_color)
-        # self.style.configure('TToplevel', background=custom_color)
 
 
         ##########
@@ -80,7 +72,8 @@ class MainFrame(ttk.Frame):
 
         # Playback controls frame
         lfrm_playback = ttk.LabelFrame(lfrm_top, text="Playback")
-        lfrm_playback.grid(column=5, row=5, rowspan=30, **options, sticky='n')
+        lfrm_playback.grid(column=5, row=5, rowspan=30, **options, 
+                           sticky='n')
 
         # SLM measured value frame
         lfrm_slm = ttk.LabelFrame(lfrm_top, text="Offsets")
@@ -88,7 +81,8 @@ class MainFrame(ttk.Frame):
 
         # Offset button frame
         lfrm_make_file = ttk.LabelFrame(lfrm_top, text="Save Offsets")
-        lfrm_make_file.grid(column=10, columnspan=30, row=10, padx=10, sticky='nsew')
+        lfrm_make_file.grid(column=10, columnspan=30, row=10, padx=10, 
+                            sticky='nsew')
         lfrm_make_file.columnconfigure(5, weight=1)
 
         # SEPARATOR
@@ -113,14 +107,14 @@ class MainFrame(ttk.Frame):
         ttk.Label(lfrm_playback, text="Duration (s):").grid(
             column=5, row=5, sticky='e', **options_small)
         ent_dur = ttk.Entry(lfrm_playback, 
-            textvariable=self.sessionpars['duration'], width=6)
+            textvariable=self.settings['duration'], width=6)
         ent_dur.grid(column=10, row=5, sticky='w', **options_small)
 
         # Level
         ttk.Label(lfrm_playback, text="Level (dB):").grid(
             column=5, row=10, sticky='e', **options_small)
         ent_slm = ttk.Entry(lfrm_playback, 
-            textvariable=self.sessionpars['level'], width=6)
+            textvariable=self.settings['level'], width=6)
         ent_slm.grid(column=10, row=10, sticky='w', **options_small)
  
         # Play stimulus
@@ -172,13 +166,17 @@ class MainFrame(ttk.Frame):
         # Create offset labels and speaker buttons
         for channel in range(0, self._num_speakers):
             # Offset labels: vertical Labels to display offsets
-            lbl_speaker_offset = ttk.Label(lfrm_offsets, text=f"{channel+1}: -")
-            lbl_speaker_offset.grid(column=5, row=channel, sticky='w', padx=5)
+            lbl_speaker_offset = ttk.Label(
+                lfrm_offsets, text=f"{channel+1}: -")
+            lbl_speaker_offset.grid(
+                column=5, row=channel, sticky='w', padx=5)
             self.offset_labels.append(lbl_speaker_offset)
 
             # Speaker number labels: speaker LabelFrame
-            lbl_speaker_num = ttk.Label(self.lfrm_speakers, text=channel+1)
-            lbl_speaker_num.grid(column=channel, row=5, sticky='w', padx=(5,0))
+            lbl_speaker_num = ttk.Label(
+                self.lfrm_speakers, text=channel+1)
+            lbl_speaker_num.grid(
+                column=channel, row=5, sticky='w', padx=(5,0))
             self.label_list.append(lbl_speaker_num)
             # Speaker number radiobuttons" speaker LabelFrame
             rad_speaker_num = ttk.Radiobutton(
@@ -201,16 +199,14 @@ class MainFrame(ttk.Frame):
     def _next_speaker(self):
         """ Calculate next speaker to advance to. """
         next_speaker = self._vars['selected_speaker'].get() + 1
-        if next_speaker >= self.sessionpars['num_speakers'].get():
+        if next_speaker >= self.settings['num_speakers'].get():
             next_speaker = 0
         self._vars['selected_speaker'].set(next_speaker)
         return next_speaker
 
 
     def _on_submit(self):
-        """ Send event to controller. 
-        """
-        # Submit event to controller
+        """ Send submit event to controller. """
         self.event_generate('<<MainSubmit>>')
 
         # Select next speaker
@@ -218,8 +214,7 @@ class MainFrame(ttk.Frame):
 
 
     def update_offset_labels(self, channel, offset):
-        """ Display calculated offset in offset label frame.
-        """
+        """ Display calculated offset in offset label frame. """
         self.offset_labels[channel].configure(text=f"{channel+1}: {offset}")
 
 
@@ -277,9 +272,12 @@ class MainFrame(ttk.Frame):
 
 
     def _on_play(self):
-        self.sessionpars['channel_routing'].set(self._vars['selected_speaker'].get()+1)
+        """ Send start audio playback event to controller. """
+        self.settings['channel_routing'].set(
+            self._vars['selected_speaker'].get()+1)
         self.event_generate('<<MainPlay>>')
 
 
     def _on_stop(self):
+        """ Send stop audio playback event to controller. """
         self.event_generate('<<MainStop>>')
