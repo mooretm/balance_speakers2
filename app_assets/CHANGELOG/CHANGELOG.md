@@ -3,10 +3,14 @@
 
 ## Version 3.0.0
 
-Date March 20, 2024
+Date March 25, 2024
 
 ### Major Features
 1. Refactored project to use shared common resources (tmpy). Local references to common modules have been removed.
+
+### Patches
+1. Added several unit tests.
+2. Fixed a bug that stopped the README and CHANGELOG files from opening in the browser. 
 <br>
 <br>
 

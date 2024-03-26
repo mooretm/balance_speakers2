@@ -13,23 +13,26 @@
 import tkinter as tk
 from tkinter import messagebox
 
-# Data Science
+# Data
 import numpy as np
 import random
 
 # System
+import datetime
+import os
 from pathlib import Path
+import sys
 from threading import Thread
-import os, sys, time, datetime
+import time
 
 # Web
 import webbrowser, markdown
 
-# Custom Modules
+# Custom
 sys.path.append(os.environ['TMPY'])
 # Menus
 from menus import mainmenu
-# Exception imports
+# Exceptions
 from tmgui.shared_exceptions import audio_exceptions
 # Models
 from tmgui.shared_models import versionmodel
@@ -40,7 +43,7 @@ from models import settingsmodel
 from models import speakermodel
 # Views
 from views import mainview
-from views import sessionview
+from views import settingsview
 from tmgui.shared_views import audioview
 from tmgui.shared_views import calibrationview
 # Images
@@ -54,8 +57,7 @@ from app_assets import CHANGELOG
 # BEGIN #
 #########
 class Application(tk.Tk):
-    """ Application root window
-    """
+    """ Application root window. """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -64,7 +66,7 @@ class Application(tk.Tk):
         #############
         self.NAME = 'Speaker Balancer'
         self.VERSION = '3.0.0'
-        self.EDITED = 'March 20, 2024'
+        self.EDITED = 'March 25, 2024'
 
         # Create menu settings dictionary
         self._app_info = {
@@ -72,7 +74,6 @@ class Application(tk.Tk):
             'version': self.VERSION,
             'last_edited': self.EDITED
         }
-
 
         ######################################
         # Initialize Models, Menus and Views #
@@ -101,7 +102,7 @@ class Application(tk.Tk):
         # or load defaults if file does not exist yet
         # Check for version updates and destroy if mandatory
         self.settings_model = settingsmodel.SettingsModel(self._app_info)
-        self._load_sessionpars()
+        self._load_settings()
 
         # Create SpeakerWrangler object
         self.speakers = self._create_speakerwrangler()
@@ -120,7 +121,7 @@ class Application(tk.Tk):
         # Create callback dictionary
         event_callbacks = {
             # File menu
-            '<<FileSession>>': lambda _: self._show_session_dialog(),
+            '<<FileSession>>': lambda _: self._show_settings_dialog(),
             '<<FileQuit>>': lambda _: self._quit(),
 
             # Tools menu
@@ -132,18 +133,18 @@ class Application(tk.Tk):
             '<<HelpREADME>>': lambda _: self._show_help(),
             '<<HelpChangelog>>': lambda _: self._show_changelog(),
 
-            # Session dialog commands
+            # Settings window
             '<<SessionSubmit>>': lambda _: self._save_sessionpars(),
 
-            # Calibration dialog commands
+            # Calibration window
             '<<CalPlay>>': lambda _: self.play_calibration_file(),
             '<<CalStop>>': lambda _: self.stop_audio(),
             '<<CalibrationSubmit>>': lambda _: self._calc_offset(),
 
-            # Audio dialog commands
+            # Audio settings window
             '<<AudioDialogSubmit>>': lambda _: self._save_sessionpars(),
 
-            # Main View commands
+            # Main View
             '<<MainPlay>>': lambda _: self._on_play(),
             '<<MainStop>>': lambda _: self.stop_audio(),
             '<<MainSubmit>>': lambda _: self._on_submit(),
@@ -224,9 +225,8 @@ class Application(tk.Tk):
 
         # Instantiate and populate SpeakerWrangler
         sw = speakermodel.SpeakerWrangler()
-        for ii in range(0,num_speakers):
+        for ii in range(0, num_speakers):
             sw.add_speaker(ii)
-
         return sw
 
 
@@ -248,10 +248,10 @@ class Application(tk.Tk):
     ###################
     # File Menu Funcs #
     ###################
-    def _show_session_dialog(self):
+    def _show_settings_dialog(self):
         """ Show session parameter dialog. """
         print("\ncontroller: Calling session dialog...")
-        sessionview.SessionDialog(self, self.settings)
+        settingsview.SessionDialog(self, self.settings)
 
 
     ########################
@@ -354,12 +354,12 @@ class Application(tk.Tk):
             return
 
 
-    ############################
-    # Session Dialog Functions #
-    ############################
-    def _load_sessionpars(self):
-        """ Load parameters into self.settings dict 
-        """
+    #############################
+    # Settings Dialog Functions #
+    #############################
+    def _load_settings(self):
+        """ Load parameters into self.settings dict. """
+        # Variable types
         vartypes = {
         'bool': tk.BooleanVar,
         'str': tk.StringVar,
@@ -367,7 +367,7 @@ class Application(tk.Tk):
         'float': tk.DoubleVar
         }
 
-        # Create runtime dict from session model fields
+        # Create runtime dict from settingsmodel fields
         self.settings = dict()
         for key, data in self.settings_model.fields.items():
             vartype = vartypes.get(data['type'], tk.StringVar)
@@ -389,7 +389,7 @@ class Application(tk.Tk):
     # Tools Menu Functions #
     ########################
     def _on_test_offsets(self):
-        """ Start automated offset test thread."""
+        """ Start automated offset test thread. """
         # Delete existig instances of thread object
         try:
             del self.t
@@ -425,8 +425,10 @@ class Application(tk.Tk):
             chan=str(ii+1)
             self.settings['channel_routing'].set(chan)
 
+            # Start audio playback
             self._on_play()
-            #sd.wait(self.settings['duration'].get())
+
+            # Sleep for duration of playback
             time.sleep(self.settings['duration'].get())
 
             # Disable current speaker button
@@ -541,7 +543,7 @@ class Application(tk.Tk):
                 message="Cannot find the audio file!",
                 detail="Go to File>Session to specify a valid audio path."
             )
-            self._show_session_dialog()
+            self._show_settings_dialog()
             return
         except audio_exceptions.InvalidAudioType:
             raise

@@ -1,8 +1,6 @@
 """ Class to create speaker objects and a speaker wrangler.
 
     Written by: Travis M. Moore
-    Created: June 9, 2022
-    Last edited: January 02, 2024
 """
 
 ###########
@@ -61,16 +59,15 @@ class SpeakerWrangler:
 
 
     def check_for_missing_offsets(self):
-        """ Loop through each Speaker object and test whether the .calibrated
-            attribute is set to True.
+        """ Loop through each Speaker object and test whether the 
+            .calibrated attribute is set to True.
         """
         print(f"\nspeakermodel: Checking for missing offsets...")
         missing_offsets = []
         for speaker in self.speaker_list:
             if not speaker.calibrated:
                 missing_offsets.append(speaker.channel)
-                msg = "Missing offset for speaker "\
-                    f"{speaker.channel}!"
+                msg = f"Missing offset for speaker {speaker.channel}!"
                 print("speakermodel: " + msg)
         print("speakermodel: Done")
         return missing_offsets
@@ -78,8 +75,6 @@ class SpeakerWrangler:
 
     def get_data(self):
         """ Return a dictionary of channels and offsets. """
-        #channels = range(1, len(self.speaker_list))
         channels = [speaker.channel for speaker in self.speaker_list]
         offsets = [speaker.offset for speaker in self.speaker_list]
-        
         return dict(zip(channels, offsets))

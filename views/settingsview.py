@@ -12,8 +12,7 @@ from tkinter import ttk
 # BEGIN #
 #########
 class SessionDialog(tk.Toplevel):
-    """ Dialog for setting session parameters
-    """
+    """ Dialog for setting session parameters. """
     def __init__(self, parent, settings, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.parent = parent
@@ -113,9 +112,10 @@ class SessionDialog(tk.Toplevel):
 
 
     def _on_submit(self):
-        """ Check number of presentations != 0.
-            Send submit event to controller.
-        """
-        print("\nsessionview: Sending save event...")
+        """ Send submit event to controller and close window. """
+        print("\nsettingsview: Sending save event...")
         self.parent.event_generate('<<SessionSubmit>>')
         self.destroy()
+
+if __name__ == "__main__":
+    pass

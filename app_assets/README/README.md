@@ -7,9 +7,9 @@
 
     Written by: <b>Travis M. Moore</b>
     <br>
-    Latest version: <b>Version 2.0.0</b><br>
+    Latest version: <b>Version 3.0.0</b><br>
     Originally created: <b>June 20, 2022</b><br>
-    Last edited: <b>January 02, 2024</b><br><br>
+    Last edited: <b>March 25, 2024</b><br><br>
 </div>
 
 ---
@@ -59,7 +59,7 @@ The Speaker Balancer offers all the controls you will need on a single screen fo
 ### Playback Group
 - Duration (s): The duration of the white noise in seconds
 
-- Level (dB): The scaling factor to apply to the white noise. Adjust this level until the sound level meter reads around 70 dB C (slow). 
+- Level (dB): The scaling factor to apply to the white noise. Adjust this level until the sound level meter reads around 70 dB A (slow). 
 
 - Play button: Begin audio playback.
 
@@ -108,7 +108,7 @@ The Calibration window provides a simple way to calibrate your stimuli using a s
 
 # Compiling from Source
 ```
-pyinstaller --noconfirm --onefile --windowed --icon "C:/Users/MooTra/Code/Python/balance_speakers2/app_assets/images/logo_icons/logo_full.ico" --add-data "C:/Users/MooTra/Code/Python/balance_speakers2/app_assets;app_assets/"  "C:/Users/MooTra/Code/Python/balance_speakers2/controller.py"
+pyinstaller --noconfirm --onefile --windowed --icon "C:/Users/MooTra/Code/Python/tmpy/tmgui/shared_assets/images/logo_icons/logo_full.ico" --add-data "C:/Users/MooTra/Code/Python/tmpy/tmgui;tmgui/" --add-data "C:/Users/MooTra/Code/Python/tmpy/tmdsp;tmdsp/" --paths "C:/Users/MooTra/Code/Python/tmpy/tmdsp" --paths "C:/Users/MooTra/Code/Python/tmpy/tmgui" --hidden-import "pandas" --hidden-import "sounddevice" --hidden-import "soundfile" --add-data "C:/Users/MooTra/Code/Python/balance_speakers2/app_assets;app_assets/"  "C:/Users/MooTra/Code/Python/balance_speakers2/controller.py"
 ```
 <br>
 <br>
